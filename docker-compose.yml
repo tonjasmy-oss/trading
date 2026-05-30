@@ -1,0 +1,22 @@
+version: "3.8"
+services:
+  trading-system:
+    build: .
+    ports:
+      - "8081:8081"
+    environment:
+      - LIVE_TRADING_ENABLED=false
+      - CRYPTO_EXCHANGE=gateio
+      - PORT=8081
+      - HOST=0.0.0.0
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env
+      - ./.agent_token:/app/.agent_token
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
