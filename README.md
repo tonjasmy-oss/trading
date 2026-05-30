@@ -1,292 +1,303 @@
-# Trading System
-量化交易系统，采用**三省六部制**架构，支持加密货币与股票的双市场回测/模拟/实盘交易。
+# 📊 Trading System — 三省六部 AI 交易系统
+
+> 基于多 Agent 架构的量化交易监控系统，参考 NOFX 设计理念重构
+
+**Language**: [中文](README.md) · [English](README_EN.md)
 
 ---
 
-## 系统架构
+## 🎯 项目概览
+
+本系统是一个完整的 AI 驱动的交易监控平台，支持：
+- 🪙 **加密货币**（Binance/Bybit/OKX/Hyperliquid）
+- 📈 **美股/港股/A股**（Alpaca/老虎证券/富途）
+- 🤖 **AI 决策**（DeepSeek/Qwen/OpenAI/Gemini 多模型统一）
+- 📊 **Dashboard**（React SPA + TradingView K线）
+
+---
+
+## 🏗 架构 — 三省六部
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    中书省 · 信号生成层                    │
-│   RSI / MACD / Bollinger Bands / VOTE 多策略投票 / 公式策略  │
-├─────────────────────────────────────────────────────────┤
-│                    门下省 · 风控审核层                    │
-│   仓位/频率/EMA过滤/成交量/涨跌停/连错上限 8条规则一票否决   │
-├─────────────────────────────────────────────────────────┤
-│                    尚书省 · 执行调度层                    │
-│   Binance / Gate.io / Hyperliquid / Alpaca / Tiger 多交易所│
-├─────────────────────────────────────────────────────────┤
-│         刑部 · 违规与成交记录（SQLite）                   │
-│         户部 · 权益曲线追踪                              │
-└─────────────────────────────────────────────────────────┘
+│                    三省六部 Agent 系统                    │
+├────────────┬────────────┬────────────┬───────────────────┤
+│  太子(编排) │  中书省(策略)│  门下省(风控)│   尚书省(执行)   │
+│   任务分拣  │  Data+Prompt│  RiskMgr  │   实盘交易       │
+└────────────┴────────────┴────────────┴───────────────────┘
+```
+
+| 部门 | 职责 | 核心模块 |
+|------|------|---------|
+| **太子** | 皇上旨意接收/分发/回奏 | 飞书 Relay |
+| **中书省** | 策略生成/AI Prompt 构建 | `strategy/engine.py` `prompt_builder.py` |
+| **门下省** | 风控审核/信号校验 | `risk_manager.py` `GlobalRiskManager` |
+| **尚书省** | 实盘执行/交易路由 | `stock_trading/unified_trader.py` |
+| **户部** | 资金管理/权益统计 | `portfolio.py` `database.py` |
+| **刑部** | 安全审计/权限管控 | `agent_gateway/fastapi_routes.py` |
+
+---
+
+## 🛠 技术栈
+
+| 层级 | 技术 |
+|------|------|
+| **前端** | React 18 + TypeScript + Vite + TailwindCSS + lightweight-charts |
+| **后端** | Python 3.13 + FastAPI |
+| **AI** | MCP 统一层（DeepSeek/Qwen/OpenAI/Gemini/Kimi/Grok） |
+| **数据库** | SQLite |
+| **指标** | 纯 NumPy 技术指标（EMA/RSI/MACD/ATR/BBANDS） |
+| **数据** | K线 + 技术指标 + OI/Funding Rate |
+
+---
+
+## 🚀 快速启动
+
+### 方式一：本地 Python
+
+```bash
+# 1. 克隆
+git clone https://github.com/tonjasmy-oss/trading.git
+cd trading
+
+# 2. 安装依赖
+pip install -r requirements.txt
+
+# 3. 启动后端
+python3 main.py --port 8081
+
+# 4. 启动前端（新窗口）
+cd frontend && npm install && npm run dev
+```
+
+### 方式二：Docker
+
+```bash
+docker compose up -d
+# 后端: http://localhost:8081
+# 前端: http://localhost:5173
+```
+
+### 方式三：Railway（一键部署）
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/nofx?referralCode=nofx)
+
+---
+
+## 📁 项目结构
+
+```
+trading/
+├── main.py                    # 后端入口（FastAPI + Dashboard）
+├── config.py                  # 全局配置
+├── dashboard.py                # Web Dashboard
+│
+├── strategy/                   # 【中书省】策略模块
+│   ├── data_assembler.py       # 多时间框架K线 + 指标组装
+│   ├── prompt_builder.py       # System 8段式 + User结构化Prompt
+│   ├── response_parser.py     # AI响应 XML+JSON 双层解析
+│   ├── engine.py              # 完整策略循环引擎
+│   └── indicators.py          # 纯NumPy技术指标库
+│
+├── mcp/                        # 【AI模型统一层】
+│   └── unified.py             # 多模型路由 + 计费 + Fallback
+│
+├── market_data/               # 市场数据
+│   └── oi_funding.py         # OI + Funding Rate（Binance/Bybit/OKX）
+│
+├── risk_manager.py             # 【门下省】GlobalRiskManager + Trailing Stop
+├── portfolio.py               # 【户部】持仓管理
+├── live_trading.py            # 【尚书省】实盘交易编排
+│
+├── stock_trading/             # 券商接口
+│   └── unified_trader.py      # Alpaca + Tiger + Futu 统一接口
+│
+├── crypto_api.py              # 加密货币行情
+├── stock_api.py               # 股票行情（A/港/美）
+├── monitor.py                 # 价格监控 + 飞书告警
+├── telegram_bot.py             # Telegram 控制Bot
+│
+├── frontend/                  # 【React SPA 前端】
+│   ├── src/
+│   │   ├── pages/            # Dashboard/行情/持仓/交易/告警
+│   │   ├── components/        # KLineChart（TradingView K线）
+│   │   ├── stores/            # Zustand 状态管理
+│   │   └── services/          # API 接口层
+│   └── vite.config.ts         # Vite 配置 + 代理
+│
+├── requirements.txt
+├── Dockerfile
+└── docker-compose.yml
 ```
 
 ---
 
-## 功能一览
+## ⚙️ 环境变量配置
+
+复制 `.env.example` 为 `.env`，填入以下配置：
+
+```bash
+# 交易所
+CRYPTO_API_KEY=your_binance_key
+CRYPTO_API_SECRET=your_binance_secret
+
+# AI 模型
+DEEPSEEK_API_KEY=your_deepseek_key
+
+# 飞书告警
+FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
+FEISHU_SECRET=your_feishu_secret
+
+# Telegram Bot（可选）
+TELEGRAM_BOT_TOKEN=your_telegram_token
+TELEGRAM_ALLOWED_USERS=123456,789012
+
+# Dashboard
+DASHBOARD_PORT=8081
+```
+
+---
+
+## 📊 核心功能
+
+### 策略引擎（参考 NOFX）
+
+```
+Coin Selection → Data Assembly → System Prompt → User Prompt → AI Request → Parsing → Execution
+```
 
 | 功能 | 说明 |
 |------|------|
-| **多交易所** | Binance / Gate.io / OKX / Bybit / Hyperliquid / Alpaca / Tiger |
-| **加密货币策略** | RSI / MACD / Bollinger Bands / VOTE 多策略投票 / 自定义公式 |
-| **股票策略** | A股均线交叉/RSI / 港股 / 美股 |
-| **Grid Search** | 参数批量优化，RSI_period / oversold / overbought / stop_loss / take_profit |
-| **实盘交易** | CCXT 统一接口，模拟盘/实盘切换（需 AGENT_TOKEN） |
-| **Dashboard** | Web 可视化（K线、持仓、权益曲线、买卖点标注） |
-| **飞书告警** | 持仓变化、价格异动实时推送 |
-| **缓存层** | SQLite OHLCV 缓存（TTL=1天），避免重复调接口 |
-| **MCP Server** | Model Context Protocol 服务（stdio 模式） |
-| **Agent Gateway** | Agent Token 鉴权，敏感操作受保护 |
+| **多源选币** | Static / AI500评分池 / OI持仓增长排名 / 混合模式 |
+| **多时间框架** | 5m / 15m / 1h / 4h K线 + 指标 |
+| **结构化 Prompt** | 8段式 System Prompt + 结构化 User Prompt |
+| **AI 响应解析** | XML+JSON 双层提取 + 字符编码修复 |
+| **多策略投票** | RSI + SMA + MACD 加权聚合 |
 
----
+### 风控体系（参考 NOFX 双层设计）
 
-## 目录结构
+```python
+# 代码层（硬约束）
+max_positions: 3          # 最大持仓数
+max_margin_usage: 90%      # 最大保证金使用
+min_position_size: 12 USDT # 最小仓位
+
+# AI引导层（建议值）
+altcoin_max_leverage: 5x
+min_risk_reward_ratio: 3:1
+min_confidence: 75
+```
+
+额外特性：
+- 动态风险等级（equity 回落 5% → CAUTION，10% → LOCK）
+- Trailing Stop（跟踪止损）
+- 持仓超时强制平仓（72h）
+
+### 技术指标
 
 ```
-trading-system/
-├── config.py                  # 全局配置（环境变量模式，无硬编码密钥）
-├── dashboard.py               # Web Dashboard（FastAPI + Lightweight Charts）
-├── run_dashboard.sh           # 标准化启动脚本（自动生成 AGENT_TOKEN）
-│
-├── live_trading.py            # 实盘引擎（三省六部制，1211行）
-├── shangshu_sheng.py          # 尚书省 · 执行调度层（多交易所 CCXT 封装）
-├── menxia_sheng.py            # 门下省 · 风控审核层（8条规则）
-│
-├── components/                # 重构后的模块化组件（新增）
-│   ├── signal_engine.py       # 信号引擎（RSI/SMA/MACD/BOLL/VOTE/Formula）
-│   ├── position_manager.py    # 仓位管理器（开仓/平仓/止损/DB记录）
-│   └── __init__.py
-│
-├── vibe_integration/          # Vibe-Trading 股票回测集成
-│   └── stock_backtest.py     # 多市场回测引擎（TTL=1天 SQLite 缓存）
-│
-├── stock_data/                # 股票数据层
-│   └── stock_api.py          # A股/港股/美股统一数据接口
-│
-├── stock_trading/             # 股票券商适配器
-│   ├── trading_api.py         # AlpacaTrader + TigerTrader
-│   └── unified_trader.py     # 统一交易接口
-│
-├── agent_gateway/             # Agent Gateway（Token 鉴权）
-│   └── fastapi_routes.py     # 敏感操作受 AGENT_TOKEN 保护
-│
-├── mcp_server/                # MCP Server（Model Context Protocol）
-│   └── trading_mcp.py        # stdio 模式，支持工具调用
-│
-├── batch_backtest.py          # 批量回测 + Grid Search 参数优化
-├── backtest.py                # 单标的回测引擎
-├── strategies.py              # 策略实现（RSI / MACD / Bollinger）
-├── crypto_api.py              # CCXT 封装
-├── database.py                # SQLite 数据库
-├── feishu_alert.py            # 飞书告警
-├── monitor.py                 # 价格监控
-├── portfolio.py               # 持仓管理
-│
-├── trading_system.db          # 主数据库（成交记录 + 违规记录）
-├── live_trading.db            # 实盘数据库（权益日志）
-├── ohlcv_cache/               # OHLCV 缓存（TTL=1天）
-│
-├── requirements.txt           # Python 依赖
-└── README.md
+EMA(n)   — 指数移动平均（任意周期）
+RSI(n)   — 相对强弱指数
+MACD     — MACD线 - Signal线
+ATR      — 平均真实波幅
+BBANDS   — 布林带（20周期 ±2σ）
 ```
 
 ---
 
-## 安装部署
-
-### 环境要求
-- Python >= 3.11
-- SQLite（内置，无需安装）
-- 交易所 API Key（实盘必需）
-
-### 快速启动
-
-```bash
-# 克隆
-git clone https://github.com/tonjasmy-oss/trading-system.git
-cd trading-system
-
-# 安装依赖
-pip install -r requirements.txt
-
-# 或安装核心依赖（推荐）
-pip install ccxt pandas numpy fastapi uvicorn akshare aiohttp python-dotenv
-
-# 启动 Dashboard（自动生成 AGENT_TOKEN）
-bash run_dashboard.sh
-# 访问 http://localhost:8081
-```
-
-### 环境变量配置
-
-```env
-# 交易所
-CRYPTO_EXCHANGE=gateio
-CRYPTO_API_KEY=your_api_key
-CRYPTO_API_SECRET=your_api_secret
-
-# Agent Gateway（自动生成，无需手动配置）
-# AGENT_TOKEN=自动生成于 .agent_token 文件
-
-# 飞书告警（可选）
-FEISHU_APP_ID=your_feishu_app_id
-FEISHU_APP_SECRET=your_feishu_app_secret
-FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxx
-
-# 风险控制
-PRICE_CHECK_INTERVAL=60
-PRICE_CHANGE_THRESHOLD=0.05
-
-# 实盘开关（默认 False）
-LIVE_TRADING_ENABLED=false
-LIVE_TESTNET=true
-```
-
----
-
-## 运行
-
-### Dashboard（Web 界面）
-```bash
-bash run_dashboard.sh
-# 访问 http://localhost:8081
-```
-
-### 加密货币回测
-```bash
-# Grid Search 最优参数
-python3 batch_backtest.py --grid-search --symbols BTC ETH SOL SUI
-
-# 单标的回测
-python3 backtest.py --symbol ETH/USDT --timeframe 4h
-```
-
-### 股票回测（A股 / 港股 / 美股）
-```bash
-# A股 — 均线交叉策略（浦发银行 + 平安银行）
-python3 backtest.py --codes 600000.SH,000001.SZ \
-  --start 2024-01-01 --end 2025-01-01 --strategy ma_cross --fast 5 --slow 20
-
-# 港股 — 腾讯控股
-python3 backtest.py --codes 00700.HK \
-  --start 2024-01-01 --end 2025-01-01 --strategy ma_cross
-
-# 美股 — Apple RSI策略
-python3 backtest.py --codes AAPL \
-  --start 2024-01-01 --end 2025-01-01 --strategy rsi --rsi-period 14
-```
-
-### 实盘交易
-```bash
-# 模拟盘（默认）
-python3 live_trading.py --symbol ETH/USDT --exchange binance
-
-# 实盘（需配置 AGENT_TOKEN）
-LIVE_TRADING_ENABLED=true LIVE_TESTNET=false bash run_dashboard.sh --live
-```
-
----
-
-## Dashboard API
+## 🌐 API 接口
 
 | 接口 | 方法 | 说明 |
 |------|------|------|
-| `/` | GET | Dashboard 首页 |
-| `/api/status` | GET | 系统状态（三省六部各层状态） |
+| `/api/system/status` | GET | 系统状态 |
+| `/api/sansheng/status` | GET | 三省六部架构状态 |
 | `/api/positions` | GET | 当前持仓 |
-| `/api/portfolio` | GET | 投资组合摘要 |
-| `/api/trading/mode` | POST | 切换模拟盘/实盘（**需 AGENT_TOKEN**） |
-| `/api/stock/chart` | GET | 股票K线 + 指标数据（TTL缓存） |
-| `/api/agent/v1/*` | ANY | Agent Gateway 路由（**需 AGENT_TOKEN**） |
+| `/api/portfolio/value` | GET | 持仓市值 + 盈亏 |
+| `/api/trades` | GET | 交易历史 |
+| `/api/alerts` | GET | 告警记录 |
+| `/api/market/prices` | GET | 全市场实时行情 |
+| `/api/stock/chart` | GET | 股票K线 + 回测图表 |
+| `/api/trading/mode` | POST | 实盘/模拟切换（需Token） |
 
 ---
 
-## 已优化标的（Grid Search 最优参数）
+## 🎨 前端截图
 
-| 标的 | RSI_P | Oversold | Overbought | StopLoss | TakeProfit | Score |
-|------|-------|----------|------------|---------|------------|-------|
-| BTC/USDT | 10 | 18 | 65 | 4% | 8% | 17.89 |
-| ETH/USDT | 14 | 28 | 65 | 2% | 4% | 15.55 |
-| SOL/USDT | 10 | 20 | 65 | 1.5% | 4% | 11.51 |
-| SUI/USDT | (待优化) | | | | | |
+Dashboard 包含：
+- 📈 系统总览 + 三省状态卡片
+- 🌐 四市场行情（加密/美股/港股/A股）
+- 💼 持仓管理 + 盈亏统计
+- 📋 交易记录 + 方向高亮
+- 🔔 告警历史时间线
 
----
-
-## 支持的交易所
-
-### 加密货币
-| 交易所 | 状态 | 备注 |
-|--------|------|------|
-| Binance | ✅ | 推荐实盘 |
-| Gate.io | ✅ | 默认数据源 |
-| OKX | ✅ | |
-| Bybit | ✅ | |
-| Hyperliquid | ✅ | |
-| Kraken | ✅ | |
-| Bitfinex | ✅ | |
-
-### 股票
-| 市场 | 数据源 | 券商 | 规则 |
-|------|--------|------|------|
-| A股 | akshare（免费）| TigerTrader | T+1, 印花税0.05% |
-| 港股 | akshare（免费）| TigerTrader | T+0, 印花税0.1%双边 |
-| 美股 | yfinance（免费）| AlpacaTrader | T+0, 零佣金, 分数股 |
+K线图使用 `lightweight-charts`（TradingView 开源库），支持：
+- 阴阳线（红涨绿跌）
+- 买卖点标记
+- 权益曲线
 
 ---
 
-## 策略说明
+## 🔧 开发指南
 
-| 策略 | 说明 |
-|------|------|
-| **RSI** | 相对强弱指标，Oversold 买入 / Overbought 卖出 |
-| **MACD** | 指数平滑移动平均线，金叉买入/死叉卖出 |
-| **Bollinger Bands** | 布林带突破，下轨买入/上轨卖出 |
-| **VOTE** | RSI(40%) + MACD(30%) + Bollinger(30%) 多策略投票 |
-| **ma_cross** | 均线交叉，快线金叉买入/死叉卖出 |
-| **Formula** | 自定义公式，TDX 公式字符串 → Python 函数 |
+### 添加新的技术指标
 
----
+```python
+from strategy.indicators import TechIndicators
 
-## 安全说明
-
-- **AGENT_TOKEN**：实盘切换和敏感操作强制验证，通过 `run_dashboard.sh` 自动生成
-- **无硬编码密钥**：所有 API Key / Secret / Token 均通过环境变量注入
-- **实盘保护**：未配置 `AGENT_TOKEN` 时，实盘切换接口返回 503
-- **Token 存储**：`AGENT_TOKEN` 保存于 `.agent_token` 文件（权限 600），不进入 Git
-
----
-
-## A股 T+1 注意事项
-
-A股实行 T+1 制度，当日买入次日才能卖出。策略需考虑：
-- 买入信号产生后，次日才能执行买入
-- 止损/止盈按自然日计算，非按买入当日
-
----
-
-⚠️ **风险提示**：量化交易存在风险，请先用模拟盘测试，确认策略有效后再使用实盘。
-
----
-
-## 故障排除
-
-**akshare 导入失败？**
-```bash
-pip install akshare
+ti = TechIndicators(use_lib="numpy")
+result = ti.compute_indicators(ohlcv, indicators=["EMA20", "RSI7", "MACD"])
+print(result["EMA20"][-1])
 ```
 
-**CCXT 导入失败？**
-```bash
-pip install ccxt
+### 运行策略周期（测试）
+
+```python
+from strategy.engine import AITradingEngine
+
+engine = AITradingEngine(enable_live=False)
+result = engine.run_cycle(symbols=["BTC", "ETH"])
+print(result["decisions"])
 ```
 
-**数据库权限问题？**
-```bash
-chmod 666 trading_system.db live_trading.db
+### 接入新的 AI 模型
+
+```python
+from mcp.unified import get_client
+
+client = get_client()
+resp = client.chat(
+    message="Your trading prompt",
+    system_prompt="You are a professional trader",
+    model="qwen",  # 自动 fallback
+)
+print(resp.content)
 ```
 
-**Dashboard 端口被占用？**
-```bash
-# 修改端口，编辑 dashboard.py 中的
-# uvicorn dashboard:app --host 0.0.0.0 --port 8082
+### Telegram Bot 命令
+
 ```
+/start     — 欢迎
+/status    — 系统状态
+/positions — 持仓
+/alerts    — 告警
+/price BTC — 查询价格
+/mode live — 切换实盘
+/cycle BTC — 手动触发策略周期
+/stats     — AI 调用统计
+```
+
+---
+
+## 📝 许可证
+
+本项目基于 AGPL-3.0 开源，参考 NOFX（AGPL-3.0）设计理念。
+
+NOFX 仓库：https://github.com/NoFxAiOS/nofx
+
+---
+
+## 🙏 致谢
+
+- [NOFX](https://github.com/NoFxAiOS/nofx) — AI Trading Terminal 设计参考
+- [lightweight-charts](https://tradingview.github.io/lightweight-charts/) — TradingView 开源 K线库
+- [TailwindCSS](https://tailwindcss.com/) — CSS 框架
